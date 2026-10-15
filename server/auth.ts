@@ -3,10 +3,7 @@ import { adminAuth } from "./firebaseAdmin.js";
 
 export type AdminAccess = "allowed" | "login" | "forbidden";
 
-const list = (value: string | undefined) =>
-  (value ?? "").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
-
-/** Verifies the Firebase ID token sent as `Authorization: Bearer <token>` and checks admin rights. */
+/** يتحقق من Firebase ID token المرسل كـ `Authorization: Bearer <token>` ومن صلاحية المدير. */
 export async function adminAccess(req: Request): Promise<AdminAccess> {
   const header = req.headers.authorization ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
@@ -18,10 +15,8 @@ export async function adminAccess(req: Request): Promise<AdminAccess> {
   } catch {
     return "login";
   }
-
-  if (decoded.admin === true) return "allowed"; // custom claim
-  if (list(process.env.ADMIN_UIDS).includes(decoded.uid.toLowerCase())) return "allowed";
-  const email = decoded.email?.toLowerCase();
-  if (email && decoded.email_verified === true && list(process.env.ADMIN_EMAILS).includes(email)) return "allowed";
-  return "forbidden";
+  // أول حساب يُنشأ يحصل على claim اسمه admin. ADMIN_UIDS اختياري لإضافة مديرين يدويًا.
+  if (decoded.admin === true) return "allowed";
+  const extra = (process.env.ADMIN_UIDS ?? "").split(",").map((v) => v.trim()).filter(Boolean);
+  return extra.includes(decoded.uid) ? "allowed" : "forbidden";
 }

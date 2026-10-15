@@ -235,8 +235,8 @@ export default function Admin() {
       {accessState !== "ready" && (
         <div className="admin-gate"><div className="admin-gate-card">
           <BarberLogo /><span className="eyebrow">إدارة الصالون · مصر</span>
-          <h1>{accessState === "loading" ? "بنجهّز بيانات اللوحة" : accessState === "login" ? "سجّل الدخول للإدارة" : accessState === "forbidden" ? "الحساب بلا صلاحية مدير" : "تعذر الاتصال بالخادم"}</h1>
-          <p>{accessState === "loading" ? "لحظة واحدة، بنحمّل بيانات الصالون من قاعدة البيانات." : accessState === "login" ? "سجّل الدخول بحساب المدير للوصول إلى لوحة الصالون." : accessState === "forbidden" ? "هذا الحساب غير مضاف كمدير. أضف الإيميل أو الـ UID في إعدادات السيرفر (ADMIN_EMAILS / ADMIN_UIDS)." : "تأكد من إعدادات Firebase على السيرفر، ثم أعد المحاولة."}</p>
+          <h1>{accessState === "loading" ? "بنجهّز بيانات اللوحة" : accessState === "login" ? "دخول ZIZO" : accessState === "forbidden" ? "الحساب بلا صلاحية مدير" : "تعذر الاتصال بالخادم"}</h1>
+          <p>{accessState === "loading" ? "لحظة واحدة، بنحمّل بيانات الصالون من قاعدة البيانات." : accessState === "login" ? "سجّل الدخول، أو أنشئ حسابًا — أول حساب يتم إنشاؤه يصبح المدير بكل الصلاحيات." : accessState === "forbidden" ? "هذا الحساب ليس حساب المدير. أضف الـ UID في ADMIN_UIDS على السيرفر إن أردت منحه صلاحية." : "تأكد من إعدادات Firebase على السيرفر، ثم أعد المحاولة."}</p>
           {accessState === "login" ? <LoginForm /> : accessState === "forbidden" ? <button className="button-gold button-full" onClick={() => void signOutAdmin()}>تسجيل الخروج وتجربة حساب آخر</button> : accessState === "error" ? <button className="button-gold button-full" onClick={() => window.location.reload()}>إعادة المحاولة</button> : <span className="loading-mark"><i /></span>}
         </div></div>
       )}
