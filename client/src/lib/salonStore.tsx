@@ -6,7 +6,8 @@ export type Booking = { id: string; name: string; phone: string; date: string; t
 export type Customer = { id: string; name: string; phone: string; visits: number; blocked: boolean };
 export type Discount = { id: string; code: string; kind: "percent" | "fixed"; value: number; active: boolean; uses: number };
 export type WorkDay = { day: string; enabled: boolean; start: string; end: string };
-export type SalonData = { services: Service[]; bookings: Booking[]; customers: Customer[]; discounts: Discount[]; settings: { shopOpen: boolean; hours: WorkDay[] } };
+export type WheelPrize = { id: string; label: string; kind: "coupon" | "service"; value: string; active: boolean };
+export type SalonData = { services: Service[]; bookings: Booking[]; customers: Customer[]; discounts: Discount[]; settings: { shopOpen: boolean; bookingsEnabled: boolean; hours: WorkDay[]; wheelPrizes: WheelPrize[] } };
 
 const STORAGE_KEY = "razorbook-eg-demo-v1";
 export const dayNames = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
@@ -54,6 +55,8 @@ export function createDefaultData(): SalonData {
     ],
     settings: {
       shopOpen: true,
+      bookingsEnabled: true,
+      wheelPrizes: [{ id: "wheel-1", label: "خصم 10%", kind: "coupon", value: "10", active: true }, { id: "wheel-2", label: "خصم 20 جنيه", kind: "coupon", value: "20", active: true }, { id: "wheel-3", label: "قص شعر مجانًا", kind: "service", value: "svc-cut", active: true }],
       hours: dayNames.map((day, index) => ({ day, enabled: index !== 6, start: "10:00", end: "23:00" })),
     },
   };
@@ -67,7 +70,7 @@ function readInitialData(): SalonData {
     if (!raw) return defaults;
     const saved = JSON.parse(raw) as Partial<SalonData>;
     if (!Array.isArray(saved.services) || !Array.isArray(saved.bookings) || !Array.isArray(saved.customers) || !Array.isArray(saved.discounts) || !saved.settings) return defaults;
-    return { ...defaults, ...saved, settings: { ...defaults.settings, ...saved.settings, hours: saved.settings.hours ?? defaults.settings.hours } } as SalonData;
+    return { ...defaults, ...saved, settings: { ...defaults.settings, ...saved.settings, bookingsEnabled: saved.settings.bookingsEnabled ?? true, wheelPrizes: saved.settings.wheelPrizes ?? defaults.settings.wheelPrizes, hours: saved.settings.hours ?? defaults.settings.hours } } as SalonData;
   } catch {
     return defaults;
   }

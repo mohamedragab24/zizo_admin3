@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
 import { adminAccess } from "./auth.js";
-import { createSalonBooking, getPublicSalonInfo, getSalonSnapshot, saveSalonSnapshot, validateSalonDiscount, type AdminSalonSnapshot } from "./salonRepository.js";
+import { createSalonBooking, getPublicSalonInfo, getSalonSnapshot, saveSalonSnapshot, validateSalonDiscount, registerSalonCustomer, loginSalonCustomer, type AdminSalonSnapshot } from "./salonRepository.js";
 
 const router = Router();
 const id = (max: number) => z.string().min(1).max(max).regex(/^[^/]+$/);
@@ -11,7 +11,7 @@ const adminSnapshotSchema = z.object({
   bookings: z.array(z.object({ id: z.string().max(24), name: z.string().max(160), phone: z.string().max(32), date: z.string().length(10), time: z.string().max(20), serviceIds: z.array(z.string().max(64)).max(8), status: z.enum(["مؤكد", "مكتمل", "ملغي"]), discountCode: z.string().max(40), discountAmount: z.number().finite().nonnegative(), createdAt: z.string().max(10) })).max(5000),
   customers: z.array(z.object({ id: id(64), name: z.string().max(160), phone: z.string().max(32), visits: z.number().int().nonnegative(), blocked: z.boolean() })).max(10000),
   discounts: z.array(z.object({ id: id(64), code: z.string().max(40), kind: z.enum(["percent", "fixed"]), value: z.number().finite().positive(), active: z.boolean(), uses: z.number().int().nonnegative() })).max(500),
-  settings: z.object({ shopOpen: z.boolean(), hours: z.array(z.object({ day: z.string().max(20), enabled: z.boolean(), start: z.string().max(5), end: z.string().max(5) })).max(7) }),
+  settings: z.object({ shopOpen: z.boolean(), bookingsEnabled: z.boolean().default(true), wheelPrizes: z.array(z.object({ id: id(64), label: z.string().max(100), kind: z.enum(["coupon", "service"]), value: z.string().max(100), active: z.boolean() })).max(40).default([]), hours: z.array(z.object({ day: z.string().max(20), enabled: z.boolean(), start: z.string().max(5), end: z.string().max(5) })).max(7) }),
 });
 const bookingSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -21,6 +21,8 @@ const bookingSchema = z.object({
   serviceIds: z.array(z.string().max(64)).min(1).max(8),
   discountCode: z.string().max(40).optional().default(""),
 });
+const registerSchema = z.object({ name: z.string().trim().min(2).max(160), phone: z.string().trim().min(9).max(32).regex(/^[+\d\s().-]+$/), email: z.string().trim().email().max(254), password: z.string().min(8).max(128) });
+const loginSchema = z.object({ identifier: z.string().trim().min(3).max(254), password: z.string().min(1).max(128) });
 const discountSchema = z.object({ code: z.string().trim().min(1).max(40), serviceIds: z.array(z.string().max(64)).min(1).max(8) });
 
 function respondError(res: Response, error: unknown) {
@@ -33,6 +35,36 @@ router.get("/mobile/bootstrap", async (_req, res) => {
   try {
     res.setHeader("Cache-Control", "no-store");
     return res.json(await getPublicSalonInfo());
+  } catch (error) { return respondError(res, error); }
+});
+
+router.post("/mobile/wheel/spin", async (_req, res) => {
+  try {
+    const info = await getPublicSalonInfo();
+    const prizes = info.wheelPrizes;
+    if (!prizes.length) return res.status(400).json({ error: "لا توجد جوائز متاحة حاليًا." });
+    const prize = prizes[Math.floor(Math.random() * prizes.length)];
+    return res.json({ prize });
+  } catch (error) { return respondError(res, error); }
+});
+
+router.post("/mobile/auth/register", async (req, res) => {
+  const parsed = registerSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "أدخل الاسم ورقم الهاتف والبريد الإلكتروني وكلمة مرور من 8 أحرف على الأقل." });
+  try {
+    const result = await registerSalonCustomer(parsed.data);
+    if (!result.ok) return res.status(result.status).json({ error: result.message });
+    return res.status(201).json(result.customer);
+  } catch (error) { return respondError(res, error); }
+});
+
+router.post("/mobile/auth/login", async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "أدخل رقم الهاتف أو البريد الإلكتروني وكلمة المرور." });
+  try {
+    const result = await loginSalonCustomer(parsed.data);
+    if (!result.ok) return res.status(result.status).json({ error: result.message });
+    return res.json(result.customer);
   } catch (error) { return respondError(res, error); }
 });
 

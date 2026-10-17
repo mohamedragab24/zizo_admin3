@@ -1,9 +1,10 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { adminDb } from "./firebaseAdmin.js";
 
 export type BookingStatus = "مؤكد" | "مكتمل" | "ملغي";
 export type WorkDay = { day: string; enabled: boolean; start: string; end: string };
+export type WheelPrize = { id: string; label: string; kind: "coupon" | "service"; value: string; active: boolean };
 export type ServiceDoc = { id: string; name: string; description: string; price: number; duration: number; active: boolean; icon: string };
 export type CustomerDoc = { id: string; name: string; phone: string; visits: number; blocked: boolean };
 export type DiscountDoc = { id: string; code: string; kind: "percent" | "fixed"; value: number; active: boolean; uses: number };
@@ -19,7 +20,7 @@ export type AdminSalonSnapshot = {
   bookings: { id: string; name: string; phone: string; date: string; time: string; serviceIds: string[]; status: BookingStatus; discountCode: string; discountAmount: number; createdAt: string }[];
   customers: CustomerDoc[];
   discounts: DiscountDoc[];
-  settings: { shopOpen: boolean; hours: WorkDay[] };
+  settings: { shopOpen: boolean; bookingsEnabled: boolean; hours: WorkDay[]; wheelPrizes: WheelPrize[] };
 };
 
 export const defaultWorkDays: WorkDay[] = [
@@ -62,7 +63,7 @@ async function ensureInitialized(): Promise<Firestore> {
     await batch.commit();
   }
   try {
-    await db.collection(COL.settings).doc(SETTINGS_ID).create({ country: "EG", currency: "EGP", shopOpen: true, hours: defaultWorkDays });
+    await db.collection(COL.settings).doc(SETTINGS_ID).create({ country: "EG", currency: "EGP", shopOpen: true, bookingsEnabled: true, wheelPrizes: [], hours: defaultWorkDays });
   } catch (error) {
     if ((error as { code?: number }).code !== ALREADY_EXISTS) throw error;
   }
@@ -84,7 +85,7 @@ export async function getSalonSnapshot(): Promise<AdminSalonSnapshot> {
     bookings: bookingSnap.docs.map((d) => { const x = d.data() as BookingDoc; return { id: x.bookingCode, name: x.customerName, phone: x.phone, date: x.date, time: x.time, serviceIds: (x.serviceItems ?? []).map((i) => i.id), status: x.status, discountCode: x.discountCode ?? "", discountAmount: num(x.discountAmount), createdAt: String(x.createdAt ?? "").slice(0, 10) }; }),
     customers: customerSnap.docs.map((d) => { const x = d.data(); return { id: d.id, name: x.name, phone: x.phone, visits: num(x.visits), blocked: Boolean(x.blocked) }; }),
     discounts: discountSnap.docs.map((d) => { const x = d.data(); return { id: d.id, code: x.code, kind: x.kind, value: num(x.value), active: Boolean(x.active), uses: num(x.uses) }; }),
-    settings: { shopOpen: Boolean(settings?.shopOpen ?? true), hours: (settings?.hours as WorkDay[] | undefined) ?? defaultWorkDays },
+    settings: { shopOpen: Boolean(settings?.shopOpen ?? true), bookingsEnabled: Boolean(settings?.bookingsEnabled ?? true), hours: (settings?.hours as WorkDay[] | undefined) ?? defaultWorkDays, wheelPrizes: (settings?.wheelPrizes as WheelPrize[] | undefined) ?? [] },
   };
 }
 
@@ -156,7 +157,7 @@ export async function saveSalonSnapshot(snapshot: AdminSalonSnapshot) {
   }
 
   const hours = snapshot.settings.hours.map((d) => ({ day: String(d.day).slice(0, 20), enabled: Boolean(d.enabled), start: String(d.start).slice(0, 5), end: String(d.end).slice(0, 5) }));
-  ops.push({ kind: "set", ref: db.collection(COL.settings).doc(SETTINGS_ID), data: { country: "EG", currency: "EGP", shopOpen: Boolean(snapshot.settings.shopOpen), hours } });
+  ops.push({ kind: "set", ref: db.collection(COL.settings).doc(SETTINGS_ID), data: { country: "EG", currency: "EGP", shopOpen: Boolean(snapshot.settings.shopOpen), bookingsEnabled: Boolean(snapshot.settings.bookingsEnabled), wheelPrizes: snapshot.settings.wheelPrizes.slice(0, 40).map((p) => ({ id: safeId(p.id), label: String(p.label).slice(0, 100), kind: p.kind === "service" ? "service" : "coupon", value: String(p.value).slice(0, 100), active: Boolean(p.active) })), hours } });
 
   await commitOps(db, ops);
   return { ok: true as const };
@@ -164,6 +165,8 @@ export async function saveSalonSnapshot(snapshot: AdminSalonSnapshot) {
 
 export async function createSalonBooking(input: { name: string; phone: string; date: string; time: string; serviceIds: string[]; discountCode?: string }) {
   const db = await ensureInitialized();
+  const settingsCheck = await db.collection(COL.settings).doc(SETTINGS_ID).get();
+  if (settingsCheck.data()?.bookingsEnabled === false) return { ok: false as const, status: 403, message: "الحجز متوقف مؤقتًا من إدارة الصالون. حاول مرة أخرى لاحقًا." };
   const normalizedPhone = input.phone.replace(/[\s()-]/g, "");
   const name = input.name.trim().slice(0, 160);
   const requested = Array.from(new Set(input.serviceIds)).slice(0, 8);
@@ -215,6 +218,49 @@ export async function createSalonBooking(input: { name: string; phone: string; d
   });
 }
 
+function passwordDigest(password: string, salt: string) {
+  return scryptSync(password, salt, 64).toString("hex");
+}
+
+export async function registerSalonCustomer(input: { name: string; phone: string; email: string; password: string }) {
+  const db = await ensureInitialized();
+  const phone = input.phone.replace(/[\s()-]/g, "");
+  const email = input.email.trim().toLowerCase();
+  const [phoneSnap, emailSnap] = await Promise.all([
+    db.collection(COL.customers).where("phone", "==", phone).limit(1).get(),
+    db.collection(COL.customers).where("email", "==", email).limit(1).get(),
+  ]);
+  if (!emailSnap.empty && emailSnap.docs[0].id !== phoneSnap.docs[0]?.id) return { ok: false as const, status: 409, message: "البريد الإلكتروني مسجل بالفعل." };
+  const existing = phoneSnap.docs[0];
+  if (existing?.data().passwordHash) return { ok: false as const, status: 409, message: "رقم الهاتف مسجل بالفعل. سجّل الدخول بدلًا من إنشاء حساب جديد." };
+  const salt = randomBytes(16).toString("hex");
+  const passwordHash = `${salt}:${passwordDigest(input.password, salt)}`;
+  const id = existing?.id ?? `cus-${randomUUID()}`;
+  const customerData = { name: input.name.trim().slice(0, 160), phone, email, passwordHash, createdAt: new Date().toISOString() };
+  if (existing) await existing.ref.update(customerData);
+  else await db.collection(COL.customers).doc(id).create({ id, ...customerData, visits: 0, blocked: false });
+  return { ok: true as const, customer: { id, name: input.name.trim(), phone, email } };
+}
+
+export async function loginSalonCustomer(input: { identifier: string; password: string }) {
+  const db = await ensureInitialized();
+  const identifier = input.identifier.trim();
+  const isEmail = identifier.includes("@");
+  const value = isEmail ? identifier.toLowerCase() : identifier.replace(/[\s()-]/g, "");
+  const snap = await db.collection(COL.customers).where(isEmail ? "email" : "phone", "==", value).limit(1).get();
+  const doc = snap.docs[0];
+  if (!doc) return { ok: false as const, status: 401, message: "بيانات الدخول غير صحيحة." };
+  const customer = doc.data();
+  if (customer.blocked) return { ok: false as const, status: 403, message: "الحساب موقوف. تواصل مع الصالون." };
+  const stored = String(customer.passwordHash ?? "");
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return { ok: false as const, status: 401, message: "الحساب قديم أو لا يحتوي على كلمة مرور. أنشئ حسابًا جديدًا." };
+  const actual = Buffer.from(passwordDigest(input.password, salt), "hex");
+  const expected = Buffer.from(hash, "hex");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return { ok: false as const, status: 401, message: "بيانات الدخول غير صحيحة." };
+  return { ok: true as const, customer: { id: doc.id, name: String(customer.name ?? ""), phone: String(customer.phone ?? ""), email: String(customer.email ?? "") } };
+}
+
 export async function getPublicSalonInfo() {
   const db = await ensureInitialized();
   const [serviceSnap, settingsSnap] = await Promise.all([
@@ -225,6 +271,8 @@ export async function getPublicSalonInfo() {
     country: "EG",
     currency: "EGP",
     shopOpen: Boolean(settingsSnap.data()?.shopOpen ?? true),
+    bookingsEnabled: Boolean(settingsSnap.data()?.bookingsEnabled ?? true),
+    wheelPrizes: ((settingsSnap.data()?.wheelPrizes as WheelPrize[] | undefined) ?? []).filter((prize) => prize.active),
     services: serviceSnap.docs.map((d) => { const x = d.data(); return { id: d.id, name: x.name, description: x.description ?? "", price: num(x.price), duration: num(x.duration, 30), active: true, icon: x.icon ?? "cut" }; }),
   };
 }

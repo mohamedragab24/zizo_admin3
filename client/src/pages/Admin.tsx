@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Activity, ArrowDownRight, ArrowLeft, ArrowUpRight, BadgePercent, Ban, Bell, CalendarCheck, CalendarDays, Check, CheckCircle2, ChevronDown, CircleDollarSign, Clock3, Eye, Filter, LayoutDashboard, Menu, MoreHorizontal, Pencil, Plus, Scissors, Search, Settings2, ShieldCheck, Store, TicketPercent, Trash2, UnlockKeyhole, UserRound, Users, Wallet, X } from "lucide-react";
+import { Activity, Gift, ArrowDownRight, ArrowLeft, ArrowUpRight, BadgePercent, Ban, Bell, CalendarCheck, CalendarDays, Check, CheckCircle2, ChevronDown, CircleDollarSign, Clock3, Eye, Filter, LayoutDashboard, Menu, MoreHorizontal, Pencil, Plus, Scissors, Search, Settings2, ShieldCheck, Store, TicketPercent, Trash2, UnlockKeyhole, UserRound, Users, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 import BarberLogo from "@/components/BarberLogo";
 import { dayNames, formatEGP, formatEgyptDate, localDateISO, useSalon, type Booking, type BookingStatus, type Discount, type Service } from "@/lib/salonStore";
 import { adminFetch, signOutAdmin, useAdminUser } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 
-type Section = "overview" | "services" | "bookings" | "completed" | "cancelled" | "users" | "discounts" | "hours";
+type Section = "overview" | "services" | "bookings" | "completed" | "cancelled" | "users" | "discounts" | "hours" | "wheel";
 
 const navItems: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "الرئيسية", icon: LayoutDashboard },
@@ -16,11 +16,12 @@ const navItems: { id: Section; label: string; icon: typeof LayoutDashboard }[] =
   { id: "cancelled", label: "الملغاة", icon: Ban },
   { id: "users", label: "المستخدمون", icon: Users },
   { id: "discounts", label: "أكواد الخصم", icon: TicketPercent },
+  { id: "wheel", label: "عجلة الحظ", icon: Gift },
   { id: "hours", label: "أوقات العمل", icon: Clock3 },
 ];
 
 const titleBySection: Record<Section, string> = {
-  overview: "نظرة عامة", services: "الخدمات والأسعار", bookings: "إدارة الحجوزات", completed: "الحجوزات المكتملة", cancelled: "الحجوزات الملغاة", users: "إدارة المستخدمين", discounts: "أكواد الخصم", hours: "أوقات العمل",
+  overview: "نظرة عامة", services: "الخدمات والأسعار", bookings: "إدارة الحجوزات", completed: "الحجوزات المكتملة", cancelled: "الحجوزات الملغاة", users: "إدارة المستخدمين", discounts: "أكواد الخصم", hours: "أوقات العمل", wheel: "إدارة عجلة الحظ",
 };
 
 const statusTone: Record<BookingStatus, string> = { "مؤكد": "status-confirmed", "مكتمل": "status-completed", "ملغي": "status-cancelled" };
@@ -38,6 +39,8 @@ export default function Admin() {
   const [discountCode, setDiscountCode] = useState("");
   const [discountKind, setDiscountKind] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState("10");
+  const [wheelLabel, setWheelLabel] = useState("");\n  const [wheelKind, setWheelKind] = useState<"coupon" | "service">("coupon");
+  const [wheelValue, setWheelValue] = useState("10");
   const [showClosedHint, setShowClosedHint] = useState(false);
   const [accessState, setAccessState] = useState<"loading" | "ready" | "login" | "forbidden" | "error">("loading");
 
@@ -206,7 +209,7 @@ export default function Admin() {
   );
 
   const bookingsPage = (
-    <section className="panel content-panel"><div className="panel-heading"><div><h3>{active === "completed" ? "الحجوزات المكتملة" : active === "cancelled" ? "الحجوزات الملغاة" : "كل الحجوزات"}</h3><p>{active === "bookings" ? "غيّر حالة أي حجز من القائمة" : "سجل الطلبات حسب الحالة"}</p></div><label className="search-box"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث بالاسم أو رقم الحجز" /></label></div>{renderBookingsTable(visibleBookings)}</section>
+    <section className="panel content-panel"><div className="panel-heading"><div><h3>{active === "completed" ? "الحجوزات المكتملة" : active === "cancelled" ? "الحجوزات الملغاة" : "كل الحجوزات"}</h3><p>{active === "bookings" ? "غيّر حالة أي حجز من القائمة" : "سجل الطلبات حسب الحالة"}</p></div><button className={data.settings.bookingsEnabled ? "button-outline" : "button-gold"} onClick={() => { setData((current) => ({ ...current, settings: { ...current.settings, bookingsEnabled: !current.settings.bookingsEnabled } })); toast.success(data.settings.bookingsEnabled ? "تم إيقاف استقبال الحجوزات الجديدة" : "تم فتح استقبال الحجوزات"); }}><Ban size={15} />{data.settings.bookingsEnabled ? "إيقاف الحجز" : "تشغيل الحجز"}</button><label className="search-box"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث بالاسم أو رقم الحجز" /></label></div>{renderBookingsTable(visibleBookings)}</section>
   );
 
   const usersPage = (
@@ -222,6 +225,27 @@ export default function Admin() {
     </section><section className="panel content-panel"><div className="panel-heading"><div><h3>الأكواد الحالية</h3><p>فعّل أو أوقف الكود وقت ما تحب</p></div></div><div className="discount-list">{data.discounts.map((item) => <article className="discount-row" key={item.id}><span className="discount-icon"><TicketPercent size={18} /></span><div className="discount-info"><strong dir="ltr">{item.code}</strong><small>{item.kind === "percent" ? `${new Intl.NumberFormat("ar-EG").format(item.value)}٪ خصم` : `${formatEGP(item.value)} خصم`}</small></div><div className="discount-uses"><b>{new Intl.NumberFormat("ar-EG").format(item.uses)}</b><small>استخدام</small></div><button className={`mini-toggle ${item.active ? "on" : ""}`} aria-label={item.active ? "إيقاف الكود" : "تفعيل الكود"} onClick={() => setData((current) => ({ ...current, discounts: current.discounts.map((discount) => discount.id === item.id ? { ...discount, active: !discount.active } : discount) }))}><i /></button></article>)}{data.discounts.length === 0 && <div className="empty-state"><TicketPercent size={24} /><strong>لسه مفيش أكواد خصم</strong></div>}</div></section></div>
   );
 
+  const addWheelPrize = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const label = wheelLabel.trim();
+    const value = wheelValue.trim();
+    if (!label || !value) { toast.error("اكتب اسم الجائزة وقيمتها"); return; }
+    setData((current) => ({ ...current, settings: { ...current.settings, wheelPrizes: [...current.settings.wheelPrizes, { id: `wheel-${Date.now()}`, label, kind: wheelKind, value, active: true }] } }));
+    setWheelLabel(""); setWheelValue("10"); toast.success("تمت إضافة الجائزة لعجلة الحظ");
+  };
+  const wheelPage = (
+    <div className="discount-layout">
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>إضافة جائزة</h3><p>أضف كوبونات خصم أو خدمة مجانية تظهر في عجلة الحظ داخل التطبيق</p></div><span className="discount-emblem"><Gift size={21} /></span></div>
+        <form className="discount-form" onSubmit={addWheelPrize}><label>اسم الجائزة<input value={wheelLabel} onChange={(e) => setWheelLabel(e.target.value)} placeholder="مثال: خصم 15%" required /></label>
+        <div className="field-grid"><label>نوع الجائزة<select value={wheelKind} onChange={(e) => setWheelKind(e.target.value as "coupon" | "service")}><option value="coupon">كوبون خصم</option><option value="service">خدمة</option></select></label><label>{wheelKind === "coupon" ? "قيمة الخصم أو الكوبون" : "معرّف الخدمة" }<input value={wheelValue} onChange={(e) => setWheelValue(e.target.value)} required /></label></div>
+        <button className="button-gold button-full" type="submit"><Plus size={16} /> إضافة للعجلة</button></form>
+      </section>
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>جوائز العجلة</h3><p>تفعيل أو إيقاف أي جائزة</p></div><span className="subtle-pill">{data.settings.wheelPrizes.filter(p => p.active).length} جائزة مفعلة</span></div>
+        <div className="discount-list">{data.settings.wheelPrizes.map((prize) => <article className="discount-row" key={prize.id}><span className="discount-icon"><Gift size={18} /></span><div className="discount-info"><strong>{prize.label}</strong><small>{prize.kind === "coupon" ? `كوبون · ${prize.value}` : `خدمة · ${prize.value}`}</small></div><button className={`mini-toggle ${prize.active ? "on" : ""}`} aria-label={prize.active ? "إيقاف الجائزة" : "تفعيل الجائزة"} onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, wheelPrizes: current.settings.wheelPrizes.map(p => p.id === prize.id ? { ...p, active: !p.active } : p) } }))}><i /></button><button className="icon-button" aria-label="حذف الجائزة" onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, wheelPrizes: current.settings.wheelPrizes.filter(p => p.id !== prize.id) } }))}><Trash2 size={15} /></button></article>)}{data.settings.wheelPrizes.length === 0 && <div className="empty-state"><Gift size={24} /><strong>أضف أول جائزة لعجلة الحظ</strong></div>}</div>
+      </section>
+    </div>
+  );
+
   const hoursPage = (
     <section className="panel content-panel hours-panel"><div className="panel-heading"><div><h3>مواعيد العمل الأسبوعية</h3><p>حدد الأيام والساعات اللي المحل بيستقبل فيها العملاء</p></div><span className="subtle-pill"><Clock3 size={14} /> توقيت مصر</span></div>
       <div className="hours-list">{data.settings.hours.map((day, index) => <div className={`hours-row${day.enabled ? "" : " day-off"}`} key={day.day}><button type="button" className={`day-switch ${day.enabled ? "on" : ""}`} aria-label={`تبديل ${day.day}`} onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, hours: current.settings.hours.map((item, i) => i === index ? { ...item, enabled: !item.enabled } : item) } }))}><i /></button><b className="hours-day">{day.day}</b>{day.enabled ? <><label><span>من</span><input type="time" value={day.start} onChange={(event) => setData((current) => ({ ...current, settings: { ...current.settings, hours: current.settings.hours.map((item, i) => i === index ? { ...item, start: event.target.value } : item) } }))} /></label><span className="hours-separator">—</span><label><span>إلى</span><input type="time" value={day.end} onChange={(event) => setData((current) => ({ ...current, settings: { ...current.settings, hours: current.settings.hours.map((item, i) => i === index ? { ...item, end: event.target.value } : item) } }))} /></label></> : <span className="day-off-label">إجازة</span>}</div>)}</div>
@@ -235,8 +259,8 @@ export default function Admin() {
       {accessState !== "ready" && (
         <div className="admin-gate"><div className="admin-gate-card">
           <BarberLogo /><span className="eyebrow">إدارة الصالون · مصر</span>
-          <h1>{accessState === "loading" ? "بنجهّز بيانات اللوحة" : accessState === "login" ? "دخول ZIZO" : accessState === "forbidden" ? "الحساب بلا صلاحية مدير" : "تعذر الاتصال بالخادم"}</h1>
-          <p>{accessState === "loading" ? "لحظة واحدة، بنحمّل بيانات الصالون من قاعدة البيانات." : accessState === "login" ? "سجّل الدخول، أو أنشئ حسابًا — أول حساب يتم إنشاؤه يصبح المدير بكل الصلاحيات." : accessState === "forbidden" ? "هذا الحساب ليس حساب المدير. أضف الـ UID في ADMIN_UIDS على السيرفر إن أردت منحه صلاحية." : "تأكد من إعدادات Firebase على السيرفر، ثم أعد المحاولة."}</p>
+          <h1>{accessState === "loading" ? "بنجهّز بيانات اللوحة" : accessState === "login" ? "سجّل الدخول للإدارة" : accessState === "forbidden" ? "الحساب بلا صلاحية مدير" : "تعذر الاتصال بالخادم"}</h1>
+          <p>{accessState === "loading" ? "لحظة واحدة، بنحمّل بيانات الصالون من قاعدة البيانات." : accessState === "login" ? "سجّل الدخول بحساب المدير للوصول إلى لوحة الصالون." : accessState === "forbidden" ? "هذا الحساب غير مضاف كمدير. أضف الإيميل أو الـ UID في إعدادات السيرفر (ADMIN_EMAILS / ADMIN_UIDS)." : "تأكد من إعدادات Firebase على السيرفر، ثم أعد المحاولة."}</p>
           {accessState === "login" ? <LoginForm /> : accessState === "forbidden" ? <button className="button-gold button-full" onClick={() => void signOutAdmin()}>تسجيل الخروج وتجربة حساب آخر</button> : accessState === "error" ? <button className="button-gold button-full" onClick={() => window.location.reload()}>إعادة المحاولة</button> : <span className="loading-mark"><i /></span>}
         </div></div>
       )}
@@ -257,6 +281,7 @@ export default function Admin() {
           {(active === "bookings" || active === "completed" || active === "cancelled") && bookingsPage}
           {active === "users" && usersPage}
           {active === "discounts" && discountsPage}
+          {active === "wheel" && wheelPage}
           {active === "hours" && hoursPage}
           <footer className="admin-footer"><span>© ٢٠٢٦ صالون الحلاقة · مصر</span><span>الأسعار بالجنيه المصري <i /> قاعدة بيانات مشتركة</span><button onClick={refreshSnapshot}>تحديث البيانات</button></footer>
         </div>
