@@ -21,10 +21,22 @@ const navItems: { id: Section; label: string; icon: typeof LayoutDashboard }[] =
 ];
 
 const titleBySection: Record<Section, string> = {
-  overview: "نظرة عامة", services: "الخدمات والأسعار", bookings: "إدارة الحجوزات", completed: "الحجوزات المكتملة", cancelled: "الحجوزات الملغاة", users: "إدارة المستخدمين", discounts: "أكواد الخصم", hours: "أوقات العمل", wheel: "إدارة عجلة الحظ",
+  overview: "نظرة عامة", 
+  services: "الخدمات والأسعار", 
+  bookings: "إدارة الحجوزات", 
+  completed: "الحجوزات المكتملة", 
+  cancelled: "الحجوزات الملغاة", 
+  users: "إدارة المستخدمين", 
+  discounts: "أكواد الخصم", 
+  hours: "أوقات العمل", 
+  wheel: "إدارة عجلة الحظ",
 };
 
-const statusTone: Record<BookingStatus, string> = { "مؤكد": "status-confirmed", "مكتمل": "status-completed", "ملغي": "status-cancelled" };
+const statusTone: Record<BookingStatus, string> = { 
+  "مؤكد": "status-confirmed", 
+  "مكتمل": "status-completed", 
+  "ملغي": "status-cancelled" 
+};
 
 function StatusBadge({ status }: { status: BookingStatus }) {
   return <span className={`status-badge ${statusTone[status]}`}><i />{status}</span>;
@@ -39,7 +51,10 @@ export default function Admin() {
   const [discountCode, setDiscountCode] = useState("");
   const [discountKind, setDiscountKind] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState("10");
-  const [wheelLabel, setWheelLabel] = useState("");\n  const [wheelKind, setWheelKind] = useState<"coupon" | "service">("coupon");
+  
+  const [wheelLabel, setWheelLabel] = useState("");
+  const [wheelKind, setWheelKind] = useState<"coupon" | "service">("coupon");
+  
   const [wheelValue, setWheelValue] = useState("10");
   const [showClosedHint, setShowClosedHint] = useState(false);
   const [accessState, setAccessState] = useState<"loading" | "ready" | "login" | "forbidden" | "error">("loading");
@@ -90,6 +105,7 @@ export default function Admin() {
     const subtotal = booking.serviceIds.reduce((sum, id) => sum + (data.services.find((service) => service.id === id)?.price ?? 0), 0);
     return total + Math.max(0, subtotal - booking.discountAmount);
   }, 0);
+
   const visibleBookings = useMemo(() => {
     let list = data.bookings;
     if (active === "completed") list = list.filter((booking) => booking.status === "مكتمل");
@@ -101,6 +117,7 @@ export default function Admin() {
   }, [active, data.bookings, query]);
 
   const changeSection = (section: Section) => { setActive(section); setMobileMenu(false); setQuery(""); };
+  
   const refreshSnapshot = async () => {
     setAccessState("loading");
     try {
@@ -114,10 +131,12 @@ export default function Admin() {
       toast.error("تعذر تحديث البيانات");
     }
   };
+
   const changeBookingStatus = (id: string, status: BookingStatus) => {
     setData((current) => ({ ...current, bookings: current.bookings.map((booking) => booking.id === id ? { ...booking, status } : booking) }));
     toast.success(`تم تحديث حالة الحجز إلى ${status}`);
   };
+
   const changeShopStatus = () => {
     setData((current) => ({ ...current, settings: { ...current.settings, shopOpen: !current.settings.shopOpen } }));
     setShowClosedHint(!data.settings.shopOpen);
@@ -219,10 +238,15 @@ export default function Admin() {
   );
 
   const discountsPage = (
-    <div className="discount-layout"><section className="panel content-panel"><div className="panel-heading"><div><h3>إنشاء كود خصم</h3><p>أضف عرضًا للعملاء عند الحجز</p></div><span className="discount-emblem"><BadgePercent size={21} /></span></div>
-      <form className="discount-form" onSubmit={addDiscount}><label>كود الخصم<input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="مثال: EGYPT15" dir="ltr" required /></label><div className="field-grid"><label>نوع الخصم<select value={discountKind} onChange={(event) => setDiscountKind(event.target.value as "percent" | "fixed")}><option value="percent">نسبة مئوية %</option><option value="fixed">قيمة ثابتة بالجنيه</option></select></label><label>{discountKind === "percent" ? "نسبة الخصم" : "قيمة الخصم (ج.م)"}<input type="number" min="1" max={discountKind === "percent" ? "100" : undefined} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} required /></label></div><button className="button-gold button-full" type="submit"><Plus size={16} /> إنشاء الكود</button></form>
-      <div className="discount-tip"><ShieldCheck size={16} /><span>الكود النشط يظهر للعميل كخيار اختياري أثناء الحجز.</span></div>
-    </section><section className="panel content-panel"><div className="panel-heading"><div><h3>الأكواد الحالية</h3><p>فعّل أو أوقف الكود وقت ما تحب</p></div></div><div className="discount-list">{data.discounts.map((item) => <article className="discount-row" key={item.id}><span className="discount-icon"><TicketPercent size={18} /></span><div className="discount-info"><strong dir="ltr">{item.code}</strong><small>{item.kind === "percent" ? `${new Intl.NumberFormat("ar-EG").format(item.value)}٪ خصم` : `${formatEGP(item.value)} خصم`}</small></div><div className="discount-uses"><b>{new Intl.NumberFormat("ar-EG").format(item.uses)}</b><small>استخدام</small></div><button className={`mini-toggle ${item.active ? "on" : ""}`} aria-label={item.active ? "إيقاف الكود" : "تفعيل الكود"} onClick={() => setData((current) => ({ ...current, discounts: current.discounts.map((discount) => discount.id === item.id ? { ...discount, active: !discount.active } : discount) }))}><i /></button></article>)}{data.discounts.length === 0 && <div className="empty-state"><TicketPercent size={24} /><strong>لسه مفيش أكواد خصم</strong></div>}</div></section></div>
+    <div className="discount-layout">
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>إنشاء كود خصم</h3><p>أضف عرضًا للعملاء عند الحجز</p></div><span className="discount-emblem"><BadgePercent size={21} /></span></div>
+        <form className="discount-form" onSubmit={addDiscount}><label>كود الخصم<input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="مثال: EGYPT15" dir="ltr" required /></label><div className="field-grid"><label>نوع الخصم<select value={discountKind} onChange={(event) => setDiscountKind(event.target.value as "percent" | "fixed")}><option value="percent">نسبة مئوية %</option><option value="fixed">قيمة ثابتة بالجنيه</option></select></label><label>{discountKind === "percent" ? "نسبة الخصم" : "قيمة الخصم (ج.م)"}<input type="number" min="1" max={discountKind === "percent" ? "100" : undefined} value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} required /></label></div><button className="button-gold button-full" type="submit"><Plus size={16} /> إنشاء الكود</button></form>
+        <div className="discount-tip"><ShieldCheck size={16} /><span>الكود النشط يظهر للعميل كخيار اختياري أثناء الحجز.</span></div>
+      </section>
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>الأكواد الحالية</h3><p>فعّل أو أوقف الكود وقت ما تحب</p></div></div>
+        <div className="discount-list">{data.discounts.map((item) => <article className="discount-row" key={item.id}><span className="discount-icon"><TicketPercent size={18} /></span><div className="discount-info"><strong dir="ltr">{item.code}</strong><small>{item.kind === "percent" ? `${new Intl.NumberFormat("ar-EG").format(item.value)}٪ خصم` : `${formatEGP(item.value)} خصم`}</small></div><div className="discount-uses"><b>{new Intl.NumberFormat("ar-EG").format(item.uses)}</b><small>استخدام</small></div><button className={`mini-toggle ${item.active ? "on" : ""}`} aria-label={item.active ? "إيقاف الكود" : "تفعيل الكود"} onClick={() => setData((current) => ({ ...current, discounts: current.discounts.map((discount) => discount.id === item.id ? { ...discount, active: !discount.active } : discount) }))}><i /></button></article>)}{data.discounts.length === 0 && <div className="empty-state"><TicketPercent size={24} /><strong>لسه مفيش أكواد خصم</strong></div>}</div>
+      </section>
+    </div>
   );
 
   const addWheelPrize = (event: FormEvent<HTMLFormElement>) => {
@@ -233,12 +257,13 @@ export default function Admin() {
     setData((current) => ({ ...current, settings: { ...current.settings, wheelPrizes: [...current.settings.wheelPrizes, { id: `wheel-${Date.now()}`, label, kind: wheelKind, value, active: true }] } }));
     setWheelLabel(""); setWheelValue("10"); toast.success("تمت إضافة الجائزة لعجلة الحظ");
   };
+
   const wheelPage = (
     <div className="discount-layout">
       <section className="panel content-panel"><div className="panel-heading"><div><h3>إضافة جائزة</h3><p>أضف كوبونات خصم أو خدمة مجانية تظهر في عجلة الحظ داخل التطبيق</p></div><span className="discount-emblem"><Gift size={21} /></span></div>
         <form className="discount-form" onSubmit={addWheelPrize}><label>اسم الجائزة<input value={wheelLabel} onChange={(e) => setWheelLabel(e.target.value)} placeholder="مثال: خصم 15%" required /></label>
-        <div className="field-grid"><label>نوع الجائزة<select value={wheelKind} onChange={(e) => setWheelKind(e.target.value as "coupon" | "service")}><option value="coupon">كوبون خصم</option><option value="service">خدمة</option></select></label><label>{wheelKind === "coupon" ? "قيمة الخصم أو الكوبون" : "معرّف الخدمة" }<input value={wheelValue} onChange={(e) => setWheelValue(e.target.value)} required /></label></div>
-        <button className="button-gold button-full" type="submit"><Plus size={16} /> إضافة للعجلة</button></form>
+          <div className="field-grid"><label>نوع الجائزة<select value={wheelKind} onChange={(e) => setWheelKind(e.target.value as "coupon" | "service")}><option value="coupon">كوبون خصم</option><option value="service">خدمة</option></select></label><label>{wheelKind === "coupon" ? "قيمة الخصم أو الكوبون" : "معرّف الخدمة" }<input value={wheelValue} onChange={(e) => setWheelValue(e.target.value)} required /></label></div>
+          <button className="button-gold button-full" type="submit"><Plus size={16} /> إضافة للعجلة</button></form>
       </section>
       <section className="panel content-panel"><div className="panel-heading"><div><h3>جوائز العجلة</h3><p>تفعيل أو إيقاف أي جائزة</p></div><span className="subtle-pill">{data.settings.wheelPrizes.filter(p => p.active).length} جائزة مفعلة</span></div>
         <div className="discount-list">{data.settings.wheelPrizes.map((prize) => <article className="discount-row" key={prize.id}><span className="discount-icon"><Gift size={18} /></span><div className="discount-info"><strong>{prize.label}</strong><small>{prize.kind === "coupon" ? `كوبون · ${prize.value}` : `خدمة · ${prize.value}`}</small></div><button className={`mini-toggle ${prize.active ? "on" : ""}`} aria-label={prize.active ? "إيقاف الجائزة" : "تفعيل الجائزة"} onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, wheelPrizes: current.settings.wheelPrizes.map(p => p.id === prize.id ? { ...p, active: !p.active } : p) } }))}><i /></button><button className="icon-button" aria-label="حذف الجائزة" onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, wheelPrizes: current.settings.wheelPrizes.filter(p => p.id !== prize.id) } }))}><Trash2 size={15} /></button></article>)}{data.settings.wheelPrizes.length === 0 && <div className="empty-state"><Gift size={24} /><strong>أضف أول جائزة لعجلة الحظ</strong></div>}</div>
@@ -249,7 +274,7 @@ export default function Admin() {
   const hoursPage = (
     <section className="panel content-panel hours-panel"><div className="panel-heading"><div><h3>مواعيد العمل الأسبوعية</h3><p>حدد الأيام والساعات اللي المحل بيستقبل فيها العملاء</p></div><span className="subtle-pill"><Clock3 size={14} /> توقيت مصر</span></div>
       <div className="hours-list">{data.settings.hours.map((day, index) => <div className={`hours-row${day.enabled ? "" : " day-off"}`} key={day.day}><button type="button" className={`day-switch ${day.enabled ? "on" : ""}`} aria-label={`تبديل ${day.day}`} onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, hours: current.settings.hours.map((item, i) => i === index ? { ...item, enabled: !item.enabled } : item) } }))}><i /></button><b className="hours-day">{day.day}</b>{day.enabled ? <><label><span>من</span><input type="time" value={day.start} onChange={(event) => setData((current) => ({ ...current, settings: { ...current.settings, hours: current.settings.hours.map((item, i) => i === index ? { ...item, start: event.target.value } : item) } }))} /></label><span className="hours-separator">—</span><label><span>إلى</span><input type="time" value={day.end} onChange={(event) => setData((current) => ({ ...current, settings: { ...current.settings, hours: current.settings.hours.map((item, i) => i === index ? { ...item, end: event.target.value } : item) } }))} /></label></> : <span className="day-off-label">إجازة</span>}</div>)}</div>
-      <div className="manual-status-card"><span className={`manual-status-icon ${data.settings.shopOpen ? "open" : "closed"}`}><Store size={22} /></span><div><strong>حالة المحل الآن</strong><small>{data.settings.shopOpen ? "المحل ظاهر للعملاء على أنه مفتوح" : "المحل ظاهر للعملاء على أنه مغلق"} — الحجز متاح في الحالتين</small></div><button className={`status-toggle-button ${data.settings.shopOpen ? "open" : "closed"}`} onClick={changeShopStatus}><i />{data.settings.shopOpen ? "المحل مفتوح" : "المحل مغلق"}<ChevronDown size={15} /></button></div>
+      <div className="manual-status-card"><span className={`manual-status-icon ${data.settings.shopOpen ? "open" : "closed"}}`}><Store size={22} /></span><div><strong>حالة المحل الآن</strong><small>{data.settings.shopOpen ? "المحل ظاهر للعملاء على أنه مفتوح" : "المحل ظاهر للعملاء على أنه مغلق"} — الحجز متاح في الحالتين</small></div><button className={`status-toggle-button ${data.settings.shopOpen ? "open" : "closed"}`} onClick={changeShopStatus}><i />{data.settings.shopOpen ? "المحل مفتوح" : "المحل مغلق"}<ChevronDown size={15} /></button></div>
       {showClosedHint && !data.settings.shopOpen && <p className="info-banner"><CheckCircle2 size={16} /> يمكن للعملاء حجز موعد حتى أثناء إغلاق المحل.</p>}
     </section>
   );
@@ -273,21 +298,39 @@ export default function Admin() {
         <div className="sidebar-bottom"><div className="sidebar-status"><span className={`status-dot ${data.settings.shopOpen ? "" : "closed"}`} /><span><b>{data.settings.shopOpen ? "المحل مفتوح" : "المحل مغلق"}</b><small>{data.settings.shopOpen ? "استقبال الحجوزات متاح" : "الحجز ما زال متاحًا"}</small></span></div><button className="back-to-app" onClick={() => void signOutAdmin()}><LayoutDashboard size={16} /> تسجيل الخروج</button></div>
       </aside>
 
-      <section className={`admin-main${accessState !== "ready" ? " admin-hidden" : ""}`}>
-        <header className="admin-topbar"><button className="mobile-menu-button icon-button" onClick={() => setMobileMenu(true)} aria-label="فتح القائمة"><Menu size={20} /></button><div className="topbar-title"><span className="topbar-crumb">لوحة الإدارة <span>/</span></span><h1>{titleBySection[active]}</h1></div><div className="admin-top-actions"><span className="today-chip"><CalendarDays size={15} /> {new Intl.DateTimeFormat("ar-EG", { day: "numeric", month: "short" }).format(new Date())}</span><button className="icon-button notification-button" aria-label="الإشعارات"><Bell size={18} /><i /></button><button className={`admin-shop-toggle ${data.settings.shopOpen ? "is-open" : "is-closed"}`} onClick={changeShopStatus}><i />{data.settings.shopOpen ? "المحل مفتوح" : "المحل مغلق"}<ChevronDown size={15} /></button></div></header>
-        <div className="admin-content">
-          {active === "overview" && overview}
-          {active === "services" && servicesPage}
-          {(active === "bookings" || active === "completed" || active === "cancelled") && bookingsPage}
-          {active === "users" && usersPage}
-          {active === "discounts" && discountsPage}
-          {active === "wheel" && wheelPage}
-          {active === "hours" && hoursPage}
-          <footer className="admin-footer"><span>© ٢٠٢٦ صالون الحلاقة · مصر</span><span>الأسعار بالجنيه المصري <i /> قاعدة بيانات مشتركة</span><button onClick={refreshSnapshot}>تحديث البيانات</button></footer>
-        </div>
-      </section>
+      <section className={`admin-main${accessState !== "ready" ? " admin-hidden" : ""}`}>  
+        <header className="admin-topbar">
+          <button className="mobile-menu-button icon-button" onClick={() => setMobileMenu(true)} aria-label="فتح القائمة"><Menu size={20} /></button>
+          <div className="topbar-title"><span className="topbar-crumb">لوحة الإدارة <span>/</span></span><h1>{titleBySection[active]}</h1></div>
+          <div className="admin-top-actions">
+            <span className="today-chip"><CalendarDays size={15} /> {new Intl.DateTimeFormat("ar-EG", { day: "numeric", month: "short" }).format(new Date())}</span>
+            <button className="icon-button notification-button" aria-label="الإشعارات"><Bell size={18} /><i /></button>
+            <button className={`admin-shop-toggle ${data.settings.shopOpen ? "is-open" : "is-closed"}`} onClick={changeShopStatus}><i />{data.settings.shopOpen ? "المحل مفتوح" : "المحل مغلق"}<ChevronDown size={15} /></button>
+          </div>
+        </header>  
+        <div className="admin-content">  
+          {active === "overview" && overview}  
+          {active === "services" && servicesPage}  
+          {(active === "bookings" || active === "completed" || active === "cancelled") && bookingsPage}  
+          {active === "users" && usersPage}  
+          {active === "discounts" && discountsPage}  
+          {active === "wheel" && wheelPage}  
+          {active === "hours" && hoursPage}  
+          <footer className="admin-footer"><span>© ٢٠٢٦ صالون الحلاقة · مصر</span><span>الأسعار بالجنيه المصري <i /> قاعدة بيانات مشتركة</span><button onClick={refreshSnapshot}>تحديث البيانات</button></footer>  
+        </div>  
+      </section>  
 
-      {serviceEditor !== false && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setServiceEditor(false); }}><form className="service-modal" onSubmit={saveService}><div className="modal-heading"><span className="modal-icon"><Scissors size={19} /></span><div><h3>{serviceEditor ? "تعديل الخدمة" : "إضافة خدمة جديدة"}</h3><p>الأسعار بالجنيه المصري</p></div><button type="button" className="icon-button" onClick={() => setServiceEditor(false)} aria-label="إغلاق"><X size={18} /></button></div><label>اسم الخدمة<input name="name" defaultValue={serviceEditor?.name ?? ""} placeholder="مثال: قص شعر" required autoFocus /></label><label>وصف قصير<input name="description" defaultValue={serviceEditor?.description ?? ""} placeholder="وصف بسيط يظهر للعميل" /></label><div className="field-grid"><label>السعر (ج.م)<input name="price" type="number" min="0" defaultValue={serviceEditor?.price ?? ""} required /></label><label>المدة (دقيقة)<input name="duration" type="number" min="5" defaultValue={serviceEditor?.duration ?? 30} required /></label></div><div className="modal-actions"><button type="button" className="button-outline" onClick={() => setServiceEditor(false)}>إلغاء</button><button className="button-gold" type="submit">حفظ الخدمة <Check size={16} /></button></div></form></div>}
+      {serviceEditor !== false && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setServiceEditor(false); }}>
+          <form className="service-modal" onSubmit={saveService}>
+            <div className="modal-heading"><span className="modal-icon"><Scissors size={19} /></span><div><h3>{serviceEditor ? "تعديل الخدمة" : "إضافة خدمة جديدة"}</h3><p>الأسعار بالجنيه المصري</p></div><button type="button" className="icon-button" onClick={() => setServiceEditor(false)} aria-label="إغلاق"><X size={18} /></button></div>
+            <label>اسم الخدمة<input name="name" defaultValue={serviceEditor?.name ?? ""} placeholder="مثال: قص شعر" required autoFocus /></label>
+            <label>وصف قصير<input name="description" defaultValue={serviceEditor?.description ?? ""} placeholder="وصف بسيط يظهر للعميل" /></label>
+            <div className="field-grid"><label>السعر (ج.م)<input name="price" type="number" min="0" defaultValue={serviceEditor?.price ?? ""} required /></label><label>المدة (دقيقة)<input name="duration" type="number" min="5" defaultValue={serviceEditor?.duration ?? 30} required /></label></div>
+            <div className="modal-actions"><button type="button" className="button-outline" onClick={() => setServiceEditor(false)}>إلغاء</button><button className="button-gold" type="submit">حفظ الخدمة <Check size={16} /></button></div>
+          </form>
+        </div>
+      )}  
     </main>
   );
 }
