@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Activity, Gift, ArrowDownRight, ArrowLeft, ArrowUpRight, BadgePercent, Ban, Bell, CalendarCheck, CalendarDays, Check, CheckCircle2, ChevronDown, CircleDollarSign, Clock3, Eye, Filter, LayoutDashboard, Menu, MoreHorizontal, Pencil, Plus, Scissors, Search, Settings2, ShieldCheck, Store, TicketPercent, Trash2, UnlockKeyhole, UserRound, Users, Wallet, X } from "lucide-react";
+import { Activity, Gift, Link2, Megaphone, ArrowDownRight, ArrowLeft, ArrowUpRight, BadgePercent, Ban, Bell, CalendarCheck, CalendarDays, Check, CheckCircle2, ChevronDown, CircleDollarSign, Clock3, Eye, Filter, LayoutDashboard, Menu, MoreHorizontal, Pencil, Plus, Scissors, Search, Settings2, ShieldCheck, Store, TicketPercent, Trash2, UnlockKeyhole, UserRound, Users, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 import BarberLogo from "@/components/BarberLogo";
-import { dayNames, formatEGP, formatEgyptDate, localDateISO, useSalon, type Booking, type BookingStatus, type Discount, type Service } from "@/lib/salonStore";
+import { dayNames, socialPlatforms, formatEGP, formatEgyptDate, localDateISO, useSalon, type Booking, type BookingStatus, type Discount, type Service } from "@/lib/salonStore";
 import { adminFetch, signOutAdmin, useAdminUser } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 
-type Section = "overview" | "services" | "bookings" | "completed" | "cancelled" | "users" | "discounts" | "hours" | "wheel";
+type Section = "overview" | "services" | "bookings" | "completed" | "cancelled" | "users" | "discounts" | "hours" | "wheel" | "notifications" | "social";
 
 const navItems: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "الرئيسية", icon: LayoutDashboard },
@@ -17,6 +17,8 @@ const navItems: { id: Section; label: string; icon: typeof LayoutDashboard }[] =
   { id: "users", label: "المستخدمون", icon: Users },
   { id: "discounts", label: "أكواد الخصم", icon: TicketPercent },
   { id: "wheel", label: "عجلة الحظ", icon: Gift },
+  { id: "notifications", label: "الإشعارات", icon: Megaphone },
+  { id: "social", label: "التواصل والروابط", icon: Link2 },
   { id: "hours", label: "أوقات العمل", icon: Clock3 },
 ];
 
@@ -30,6 +32,8 @@ const titleBySection: Record<Section, string> = {
   discounts: "أكواد الخصم", 
   hours: "أوقات العمل", 
   wheel: "إدارة عجلة الحظ",
+  notifications: "إشعارات التطبيق",
+  social: "التواصل الاجتماعي والروابط",
 };
 
 const statusTone: Record<BookingStatus, string> = { 
@@ -56,6 +60,11 @@ export default function Admin() {
   const [wheelKind, setWheelKind] = useState<"coupon" | "service">("coupon");
   
   const [wheelValue, setWheelValue] = useState("10");
+  const [newPlatform, setNewPlatform] = useState("facebook");
+  const [newLabel, setNewLabel] = useState("");
+  const [newUrl, setNewUrl] = useState("");
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteBody, setNoteBody] = useState("");
   const [showClosedHint, setShowClosedHint] = useState(false);
   const [accessState, setAccessState] = useState<"loading" | "ready" | "login" | "forbidden" | "error">("loading");
 
@@ -258,8 +267,66 @@ export default function Admin() {
     setWheelLabel(""); setWheelValue("10"); toast.success("تمت إضافة الجائزة لعجلة الحظ");
   };
 
+  const addAnnouncement = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const title = noteTitle.trim();
+    const body = noteBody.trim();
+    if (!title) { toast.error("اكتب عنوان الإشعار"); return; }
+    setData((current) => ({ ...current, settings: { ...current.settings, announcements: [{ id: `note-${Date.now()}`, title, body, createdAt: new Date().toISOString() }, ...current.settings.announcements].slice(0, 50) } }));
+    setNoteTitle(""); setNoteBody(""); toast.success("تم نشر الإشعار في التطبيق");
+  };
+
+  const setSocial = (id: string, patch: Partial<{ platform: string; label: string; url: string; enabled: boolean }>) =>
+    setData((current) => ({ ...current, settings: { ...current.settings, social: current.settings.social.map((link) => link.id === id ? { ...link, ...patch } : link) } }));
+
+  const addSocial = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const url = newUrl.trim();
+    if (!url) { toast.error("اكتب الرابط أو رقم واتساب"); return; }
+    const meta = socialPlatforms.find((p) => p.key === newPlatform);
+    const link = { id: `soc-${Date.now()}`, platform: newPlatform, label: newLabel.trim() || meta?.label || "رابط", url, enabled: true };
+    setData((current) => ({ ...current, settings: { ...current.settings, social: [...current.settings.social, link].slice(0, 30) } }));
+    setNewLabel(""); setNewUrl(""); toast.success("تمت إضافة الرابط");
+  };
+
+  const notificationsPage = (
+    <div className="discount-layout">
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>إشعار جديد</h3><p>يظهر لكل العملاء في صفحة الإشعارات داخل التطبيق</p></div><span className="discount-emblem"><Megaphone size={21} /></span></div>
+        <form className="discount-form" onSubmit={addAnnouncement}><label>العنوان<input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="مثال: عرض اليوم" maxLength={120} required /></label><label>النص<input value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="تفاصيل الإشعار (اختياري)" maxLength={600} /></label><button className="button-gold button-full" type="submit"><Plus size={16} /> نشر الإشعار</button></form>
+      </section>
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>الإشعارات المنشورة</h3><p>احذف أي إشعار لإخفائه من التطبيق</p></div><span className="subtle-pill">{data.settings.announcements.length} إشعار</span></div>
+        <div className="discount-list">{data.settings.announcements.map((note) => <article className="discount-row" key={note.id}><span className="discount-icon"><Bell size={18} /></span><div className="discount-info"><strong>{note.title}</strong><small>{note.body || formatEgyptDate(note.createdAt.slice(0, 10))}</small></div><button className="icon-button" aria-label="حذف الإشعار" onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, announcements: current.settings.announcements.filter((n) => n.id !== note.id) } }))}><Trash2 size={15} /></button></article>)}{data.settings.announcements.length === 0 && <div className="empty-state"><Bell size={24} /><strong>لا توجد إشعارات منشورة</strong></div>}</div>
+      </section>
+    </div>
+  );
+
+  const socialPage = (
+    <div className="discount-layout">
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>إضافة رابط تواصل</h3><p>اختر المنصة وأضف الرابط، ويظهر تحت زر تسجيل الدخول في التطبيق</p></div><span className="discount-emblem"><Link2 size={21} /></span></div>
+        <form className="discount-form" onSubmit={addSocial}>
+          <div className="field-grid"><label>المنصة<select value={newPlatform} onChange={(e) => setNewPlatform(e.target.value)}>{socialPlatforms.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}</select></label><label>الاسم (اختياري)<input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="مثال: صفحتنا" maxLength={40} /></label></div>
+          <label>الرابط<input dir="ltr" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder={socialPlatforms.find((p) => p.key === newPlatform)?.placeholder} required /></label>
+          <button className="button-gold button-full" type="submit"><Plus size={16} /> إضافة</button>
+        </form>
+      </section>
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>الروابط الحالية</h3><p>عدّل أو أخفِ أو احذف أي رابط</p></div><span className="subtle-pill">{data.settings.social.length} رابط</span></div>
+        <div className="discount-list">{data.settings.social.map((link) => <article className="discount-row" key={link.id} style={{ flexWrap: "wrap", gap: 10 }}>
+          <select value={link.platform} onChange={(e) => setSocial(link.id, { platform: e.target.value })} aria-label="المنصة">{socialPlatforms.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}</select>
+          <input style={{ width: 110 }} value={link.label} onChange={(e) => setSocial(link.id, { label: e.target.value })} placeholder="الاسم" maxLength={40} />
+          <input dir="ltr" style={{ flex: 1, minWidth: 170 }} value={link.url} onChange={(e) => setSocial(link.id, { url: e.target.value })} placeholder="الرابط" />
+          <button className={`mini-toggle ${link.enabled ? "on" : ""}`} aria-label={link.enabled ? "إخفاء" : "إظهار"} title={link.enabled ? "ظاهر في التطبيق" : "مخفي"} onClick={() => setSocial(link.id, { enabled: !link.enabled })}><i /></button>
+          <button className="icon-button" aria-label="حذف الرابط" onClick={() => setData((current) => ({ ...current, settings: { ...current.settings, social: current.settings.social.filter((l) => l.id !== link.id) } }))}><Trash2 size={15} /></button>
+        </article>)}{data.settings.social.length === 0 && <div className="empty-state"><Link2 size={24} /><strong>لا توجد روابط بعد</strong></div>}</div>
+      </section>
+      <section className="panel content-panel"><div className="panel-heading"><div><h3>رابط التصميم والتنفيذ</h3><p>يظهر «تصميم وتنفيذ mohamed ragab» أسفل الصفحة الرئيسية، وعند الضغط عليه يفتح هذا الرابط</p></div></div>
+        <div className="discount-form"><label>الرابط<input dir="ltr" value={data.settings.designerUrl} onChange={(e) => setData((current) => ({ ...current, settings: { ...current.settings, designerUrl: e.target.value } }))} placeholder="https://..." /></label></div>
+      </section>
+    </div>
+  );
+
   const wheelPage = (
     <div className="discount-layout">
+      <section className="panel content-panel" style={{ gridColumn: "1 / -1" }}><div className="manual-status-card"><span className={`manual-status-icon ${data.settings.wheelEnabled ? "open" : "closed"}`}><Gift size={22} /></span><div><strong>تشغيل عجلة الحظ</strong><small>{data.settings.wheelEnabled ? "العجلة مفعّلة ويمكن للعملاء لفّها من التطبيق" : "العجلة مقفولة — لا يستطيع العملاء لفّها"}</small></div><button className={`status-toggle-button ${data.settings.wheelEnabled ? "open" : "closed"}`} onClick={() => { setData((current) => ({ ...current, settings: { ...current.settings, wheelEnabled: !current.settings.wheelEnabled } })); toast.success(data.settings.wheelEnabled ? "تم قفل عجلة الحظ" : "تم تفعيل عجلة الحظ"); }}><i />{data.settings.wheelEnabled ? "مفعّلة" : "مقفولة"}</button></div></section>
       <section className="panel content-panel"><div className="panel-heading"><div><h3>إضافة جائزة</h3><p>أضف كوبونات خصم أو خدمة مجانية تظهر في عجلة الحظ داخل التطبيق</p></div><span className="discount-emblem"><Gift size={21} /></span></div>
         <form className="discount-form" onSubmit={addWheelPrize}><label>اسم الجائزة<input value={wheelLabel} onChange={(e) => setWheelLabel(e.target.value)} placeholder="مثال: خصم 15%" required /></label>
           <div className="field-grid"><label>نوع الجائزة<select value={wheelKind} onChange={(e) => setWheelKind(e.target.value as "coupon" | "service")}><option value="coupon">كوبون خصم</option><option value="service">خدمة</option></select></label><label>{wheelKind === "coupon" ? "قيمة الخصم أو الكوبون" : "معرّف الخدمة" }<input value={wheelValue} onChange={(e) => setWheelValue(e.target.value)} required /></label></div>
@@ -315,6 +382,8 @@ export default function Admin() {
           {active === "users" && usersPage}  
           {active === "discounts" && discountsPage}  
           {active === "wheel" && wheelPage}  
+          {active === "notifications" && notificationsPage}  
+          {active === "social" && socialPage}  
           {active === "hours" && hoursPage}  
           <footer className="admin-footer"><span>© ٢٠٢٦ صالون الحلاقة · مصر</span><span>الأسعار بالجنيه المصري <i /> قاعدة بيانات مشتركة</span><button onClick={refreshSnapshot}>تحديث البيانات</button></footer>  
         </div>  

@@ -7,7 +7,20 @@ export type Customer = { id: string; name: string; phone: string; visits: number
 export type Discount = { id: string; code: string; kind: "percent" | "fixed"; value: number; active: boolean; uses: number };
 export type WorkDay = { day: string; enabled: boolean; start: string; end: string };
 export type WheelPrize = { id: string; label: string; kind: "coupon" | "service"; value: string; active: boolean };
-export type SalonData = { services: Service[]; bookings: Booking[]; customers: Customer[]; discounts: Discount[]; settings: { shopOpen: boolean; bookingsEnabled: boolean; hours: WorkDay[]; wheelPrizes: WheelPrize[] } };
+export type SocialLink = { id: string; platform: string; label: string; url: string; enabled: boolean };
+export type Announcement = { id: string; title: string; body: string; createdAt: string };
+export const socialPlatforms: { key: string; label: string; placeholder: string }[] = [
+  { key: "facebook", label: "فيسبوك", placeholder: "https://facebook.com/yourpage" },
+  { key: "instagram", label: "إنستجرام", placeholder: "https://instagram.com/yourpage" },
+  { key: "tiktok", label: "تيك توك", placeholder: "https://tiktok.com/@yourpage" },
+  { key: "whatsapp", label: "واتساب", placeholder: "رقم واتساب مثل 201012345678 أو رابط wa.me" },
+  { key: "youtube", label: "يوتيوب", placeholder: "https://youtube.com/@yourchannel" },
+  { key: "telegram", label: "تيليجرام", placeholder: "https://t.me/yourchannel" },
+  { key: "x", label: "إكس (تويتر)", placeholder: "https://x.com/yourpage" },
+  { key: "snapchat", label: "سناب شات", placeholder: "https://snapchat.com/add/yourname" },
+  { key: "website", label: "موقع إلكتروني", placeholder: "https://example.com" },
+];
+export type SalonData = { services: Service[]; bookings: Booking[]; customers: Customer[]; discounts: Discount[]; settings: { shopOpen: boolean; bookingsEnabled: boolean; wheelEnabled: boolean; hours: WorkDay[]; wheelPrizes: WheelPrize[]; social: SocialLink[]; designerUrl: string; announcements: Announcement[] } };
 
 const STORAGE_KEY = "razorbook-eg-demo-v1";
 export const dayNames = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
@@ -56,6 +69,10 @@ export function createDefaultData(): SalonData {
     settings: {
       shopOpen: true,
       bookingsEnabled: true,
+      wheelEnabled: true,
+      social: [],
+      designerUrl: "",
+      announcements: [],
       wheelPrizes: [{ id: "wheel-1", label: "خصم 10%", kind: "coupon", value: "10", active: true }, { id: "wheel-2", label: "خصم 20 جنيه", kind: "coupon", value: "20", active: true }, { id: "wheel-3", label: "قص شعر مجانًا", kind: "service", value: "svc-cut", active: true }],
       hours: dayNames.map((day, index) => ({ day, enabled: index !== 6, start: "10:00", end: "23:00" })),
     },
@@ -70,7 +87,7 @@ function readInitialData(): SalonData {
     if (!raw) return defaults;
     const saved = JSON.parse(raw) as Partial<SalonData>;
     if (!Array.isArray(saved.services) || !Array.isArray(saved.bookings) || !Array.isArray(saved.customers) || !Array.isArray(saved.discounts) || !saved.settings) return defaults;
-    return { ...defaults, ...saved, settings: { ...defaults.settings, ...saved.settings, bookingsEnabled: saved.settings.bookingsEnabled ?? true, wheelPrizes: saved.settings.wheelPrizes ?? defaults.settings.wheelPrizes, hours: saved.settings.hours ?? defaults.settings.hours } } as SalonData;
+    return { ...defaults, ...saved, settings: { ...defaults.settings, ...saved.settings, bookingsEnabled: saved.settings.bookingsEnabled ?? true, wheelEnabled: saved.settings.wheelEnabled ?? true, social: Array.isArray(saved.settings.social) ? saved.settings.social : [], designerUrl: saved.settings.designerUrl ?? "", announcements: saved.settings.announcements ?? [], wheelPrizes: saved.settings.wheelPrizes ?? defaults.settings.wheelPrizes, hours: saved.settings.hours ?? defaults.settings.hours } } as SalonData;
   } catch {
     return defaults;
   }
